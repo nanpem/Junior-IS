@@ -4,7 +4,7 @@
 | ---------------------------------------------------------------- | ------------------ | ---------- |
 | [Main application screen](../../issues/1)                        | September 25, 2026 | 1 hour     |
 | [Measurement instructions](../../issues/2)                       | September 25, 2026 | 30 minutes |
-| [Request microphone access](../../issues/3)                      | September 25, 2026 | 1 hour     |
+| [Request microphone access](../../issues/3)                      | September 25, 2026 | 0 hour     |
 | [Measurement countdown](../../issues/4)                          | September 25, 2026 | 30 minutes |
 | [Record room audio](../../issues/5)                              | October 2, 2026    | 30 minutes |
 | [Automatically stop recording](../../issues/6)                   | October 2, 2026    | 1 hour     |
