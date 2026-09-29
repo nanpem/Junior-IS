@@ -19,7 +19,7 @@ export default function App() {
       </Text>
 
       <TouchableOpacity
-        style={styles.startButton}
+        style={[styles.startButton, styles.firstButton]}
         onPress={startMeasurement}
       >
         <Text style={styles.buttonText}>New Room Measurement</Text>
@@ -74,6 +74,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 30,
     borderWidth: 1,
     borderRadius: 10,
+  },
+
+  firstButton: {
+    marginBottom: 15,
   },
 
   buttonText: {
