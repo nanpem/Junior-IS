@@ -7,13 +7,10 @@ import HomeScreen from "./src/screens/HomeScreen";
 import InstructionsScreen from "./src/screens/InstructionsScreen";
 import CountdownScreen from "./src/screens/CountdownScreen";
 import RecordingScreen from "./src/screens/RecordingScreen";
+import ViewRecordingsScreen from "./src/screens/ViewRecordingsScreen";
 
 
-type Screen =
-  | "home"
-  | "instructions"
-  | "countdown"
-  | "recording";
+type Screen = | "home" | "instructions"| "countdown" | "recording" | "recordings";
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>("home");
@@ -42,7 +39,7 @@ export default function App() {
   }
 
   function viewRecordings() {
-    console.log("Viewing past recordings");
+    setScreen("recordings");
   }
 
   
@@ -70,6 +67,13 @@ export default function App() {
           setRecordingUri(uri);
           console.log("Saved measurement:", uri);
         }}
+      />
+    );
+  }
+  if (screen === "recordings") {
+    return (
+      <ViewRecordingsScreen
+        onBack={() => setScreen("home")}
       />
     );
   }

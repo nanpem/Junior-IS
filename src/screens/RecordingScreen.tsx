@@ -16,9 +16,7 @@ type Props = {
   onRecordingComplete: (uri: string) => void;
 };
 
-export default function RecordingScreen({
-  onRecordingComplete,
-}: Props) {
+export default function RecordingScreen({onRecordingComplete,}: Props) {
   const [recordingComplete, setRecordingComplete] = useState(false);
   const [recordingError, setRecordingError] = useState(false);
 
@@ -57,7 +55,8 @@ export default function RecordingScreen({
 
               setRecordingComplete(true);
               onRecordingComplete(uri);
-            } else {
+            } 
+            else {
               setRecordingError(true);
             }
           } catch (error) {

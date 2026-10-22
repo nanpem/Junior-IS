@@ -1,21 +1,12 @@
 import { StatusBar } from "expo-status-bar";
-import {
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-  Platform,
-} from "react-native";
+import {StyleSheet, Text, TouchableOpacity, View, Platform,} from "react-native";
 
 type Props = {
   onStartMeasurement: () => void;
   onViewRecordings: () => void;
 };
 
-export default function HomeScreen({
-  onStartMeasurement,
-  onViewRecordings,
-}: Props) {
+export default function HomeScreen({onStartMeasurement, onViewRecordings,}: Props) {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Room Acoustic Analyzer</Text>

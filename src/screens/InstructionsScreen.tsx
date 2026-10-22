@@ -1,19 +1,11 @@
 import { StatusBar } from "expo-status-bar";
-import {
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-  Platform,
-} from "react-native";
+import {StyleSheet, Text, TouchableOpacity, View, Platform,} from "react-native";
 
 type Props = {
   onContinue: () => void;
 };
 
-export default function InstructionsScreen({
-  onContinue,
-}: Props) {
+export default function InstructionsScreen({onContinue,}: Props) {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>
