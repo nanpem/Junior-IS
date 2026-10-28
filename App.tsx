@@ -67,12 +67,14 @@ export default function App() {
           setRecordingUri(uri);
           console.log("Saved measurement:", uri);
         }}
+        onViewRecording={() => setScreen("recordings")}
       />
     );
   }
   if (screen === "recordings") {
     return (
       <ViewRecordingsScreen
+        recordingUri={recordingUri}
         onBack={() => setScreen("home")}
       />
     );

@@ -1,6 +1,7 @@
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useRef, useState } from "react";
 import {
+  Button,
   Platform,
   StyleSheet,
   Text,
@@ -14,9 +15,10 @@ import {
 
 type Props = {
   onRecordingComplete: (uri: string) => void;
+  onViewRecording: () => void;
 };
 
-export default function RecordingScreen({onRecordingComplete,}: Props) {
+export default function RecordingScreen({onRecordingComplete, onViewRecording}: Props) {
   const [recordingComplete, setRecordingComplete] = useState(false);
   const [recordingError, setRecordingError] = useState(false);
 
@@ -97,11 +99,16 @@ export default function RecordingScreen({onRecordingComplete,}: Props) {
     return (
       <View style={styles.container}>
         <Text style={styles.title}>Recording Complete</Text>
-
+  
         <Text style={styles.description}>
           The room measurement was successfully recorded.
         </Text>
-
+  
+        <Button
+          title="View Recording"
+          onPress={onViewRecording}
+        />
+  
         <StatusBar style="auto" />
       </View>
     );
