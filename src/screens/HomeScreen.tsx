@@ -1,5 +1,6 @@
 import { StatusBar } from "expo-status-bar";
 import {StyleSheet, Text, TouchableOpacity, View, Platform,} from "react-native";
+import { playTestTone } from "../audio/playTestTone";
 
 type Props = {
   onStartMeasurement: () => void;
@@ -22,6 +23,10 @@ export default function HomeScreen({onStartMeasurement, onViewRecordings,}: Prop
         <Text style={styles.buttonText}>
           New Room Measurement
         </Text>
+      </TouchableOpacity>
+      
+      <TouchableOpacity onPress={playTestTone}>
+        <Text>Test Tone</Text>
       </TouchableOpacity>
 
       <TouchableOpacity

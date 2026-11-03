@@ -7,11 +7,12 @@ import {
   Text,
   View,
 } from "react-native";
-
 import {
   RecordingPresets,
   useAudioRecorder,
+  setAudioModeAsync
 } from "expo-audio";
+import { playTestTone } from "../audio/playTestTone";
 
 type Props = {
   onRecordingComplete: (uri: string) => void;
@@ -40,9 +41,16 @@ export default function RecordingScreen({onRecordingComplete, onViewRecording}: 
 
     async function startRecording() {
       try {
+        await setAudioModeAsync({
+          allowsRecording: true,
+          playsInSilentMode: true,
+        });
         await recorder.prepareToRecordAsync();
 
         recorder.record();
+        setTimeout(() => {
+          playTestTone();
+        }, 500);
 
         console.log("Recording started");
 

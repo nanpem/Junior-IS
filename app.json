@@ -35,7 +35,8 @@
         {
           "microphonePermission": "Allow Room Acoustic Analyzer to access your microphone for room measurements."
         }
-      ]
+      ],
+      "react-native-audio-api"
     ]
   }
 }
