@@ -12,7 +12,8 @@ import {
   useAudioRecorder,
   setAudioModeAsync
 } from "expo-audio";
-import { playTestTone } from "../audio/playTestTone";
+import { playSweep } from "../audio/playSweep";
+import { saveMeasurement } from "../storage/measurementStorage";
 
 type Props = {
   onRecordingComplete: (uri: string) => void;
@@ -49,7 +50,7 @@ export default function RecordingScreen({onRecordingComplete, onViewRecording}: 
 
         recorder.record();
         setTimeout(() => {
-          playTestTone();
+          playSweep();
         }, 500);
 
         console.log("Recording started");
@@ -61,7 +62,13 @@ export default function RecordingScreen({onRecordingComplete, onViewRecording}: 
             const uri = recorder.uri;
 
             if (uri) {
-              console.log("Recording saved:", uri);
+              await saveMeasurement({
+                id: Date.now().toString(),
+                uri: uri,
+                createdAt: new Date().toISOString(),
+                x: null,
+                y: null,
+              });
 
               setRecordingComplete(true);
               onRecordingComplete(uri);

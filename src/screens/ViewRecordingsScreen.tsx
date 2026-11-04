@@ -1,32 +1,40 @@
+import { useEffect, useState } from "react";
 import { StatusBar } from "expo-status-bar";
 import { Button, StyleSheet, Text, View } from "react-native";
 import {
   setAudioModeAsync,
   useAudioPlayer,
 } from "expo-audio";
+import { Measurement } from "../types/Measurement";
+import { getMeasurements } from "../storage/measurementStorage";
 
 type Props = {
-  recordingUri: string | null;
   onBack: () => void;
 };
 
 export default function ViewRecordingsScreen({
-  recordingUri,
   onBack,
 }: Props) {
-  const player = useAudioPlayer(recordingUri);
 
-  async function playRecording() {
-    if (!recordingUri) {
-      return;
+  const [measurements, setMeasurements] = useState<Measurement[]>([]);
+  const player = useAudioPlayer(null);
+  
+  useEffect(() => {
+    async function loadMeasurements() {
+      const savedMeasurements = await getMeasurements();
+      setMeasurements(savedMeasurements);
     }
-
+  
+    loadMeasurements();
+  }, []);
+  
+  async function playRecording(uri: string) {
     await setAudioModeAsync({
       allowsRecording: false,
       playsInSilentMode: true,
     });
-
-    await player.seekTo(0);
+  
+    player.replace(uri);
     player.play();
   }
 
@@ -34,20 +42,29 @@ export default function ViewRecordingsScreen({
     <View style={styles.container}>
       <Text style={styles.title}>View Recordings</Text>
 
-      <View style={styles.recordingCard}>
-        <Text style={styles.recordingTitle}>
-          Latest Recording
-        </Text>
+      {measurements.length === 0 ? (
+        <Text>No recordings saved.</Text>
+      ) : (
+        measurements.map((measurement, index) => (
+          <View
+            key={measurement.id}
+            style={styles.recordingCard}
+          >
+            <Text style={styles.recordingTitle}>
+              Measurement {index + 1}
+            </Text>
 
-        <Text style={styles.recordingInfo}>
-          Room Measurement
-        </Text>
+            <Text style={styles.recordingInfo}>
+              {new Date(measurement.createdAt).toLocaleString()}
+            </Text>
 
-        <Button
-          title="Play Recording"
-          onPress={playRecording}
-        />
-      </View>
+            <Button
+              title="Play Recording"
+              onPress={() => playRecording(measurement.uri)}
+            />
+          </View>
+        ))
+      )}
 
       <View style={styles.backButton}>
         <Button

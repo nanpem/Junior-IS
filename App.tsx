@@ -14,7 +14,6 @@ type Screen = | "home" | "instructions"| "countdown" | "recording" | "recordings
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>("home");
-  const [recordingUri, setRecordingUri] = useState<string | null>(null);
 
   function startMeasurement() {
     setScreen("instructions");
@@ -64,7 +63,6 @@ export default function App() {
     return (
       <RecordingScreen
         onRecordingComplete={(uri) => {
-          setRecordingUri(uri);
           console.log("Saved measurement:", uri);
         }}
         onViewRecording={() => setScreen("recordings")}
@@ -74,7 +72,6 @@ export default function App() {
   if (screen === "recordings") {
     return (
       <ViewRecordingsScreen
-        recordingUri={recordingUri}
         onBack={() => setScreen("home")}
       />
     );
