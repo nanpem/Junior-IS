@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { StatusBar } from "expo-status-bar";
-import { Button, StyleSheet, Text, View } from "react-native";
+import {Button, ScrollView, StyleSheet, Text, View,} from "react-native";
 import {
   setAudioModeAsync,
   useAudioPlayer,
@@ -39,7 +39,10 @@ export default function ViewRecordingsScreen({
   }
 
   return (
-    <View style={styles.container}>
+    <ScrollView 
+    contentContainerStyle={styles.container}
+    contentInsetAdjustmentBehavior="automatic"
+    >
       <Text style={styles.title}>View Recordings</Text>
 
       {measurements.length === 0 ? (
@@ -58,6 +61,18 @@ export default function ViewRecordingsScreen({
               {new Date(measurement.createdAt).toLocaleString()}
             </Text>
 
+            <Text style={styles.recordingInfo}>
+              Position: ({measurement.x}, {measurement.y}) m
+            </Text>
+
+            <Text style={styles.recordingInfo}>
+              Room: {measurement.roomName}
+            </Text>
+
+            <Text style={styles.recordingInfo}>
+              Size: {measurement.roomWidth} m × {measurement.roomLength} m
+            </Text>
+
             <Button
               title="Play Recording"
               onPress={() => playRecording(measurement.uri)}
@@ -74,15 +89,15 @@ export default function ViewRecordingsScreen({
       </View>
 
       <StatusBar style="auto" />
-    </View>
+      </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    flexGrow: 1,
     padding: 24,
-    justifyContent: "center",
+    paddingBottom: 100,
   },
 
   title: {
@@ -95,6 +110,7 @@ const styles = StyleSheet.create({
     padding: 20,
     borderWidth: 1,
     borderRadius: 10,
+    marginBottom: 20,
   },
 
   recordingTitle: {

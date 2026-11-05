@@ -16,11 +16,26 @@ import { playSweep } from "../audio/playSweep";
 import { saveMeasurement } from "../storage/measurementStorage";
 
 type Props = {
+  roomName: string;
+  roomWidth: number;
+  roomLength: number;
+  xPosition: number;
+  yPosition: number;
   onRecordingComplete: (uri: string) => void;
   onViewRecording: () => void;
+  onAddMeasurement: () => void;
 };
 
-export default function RecordingScreen({onRecordingComplete, onViewRecording}: Props) {
+export default function RecordingScreen({
+  roomName,
+  roomWidth,
+  roomLength,
+  xPosition,
+  yPosition,
+  onRecordingComplete,
+  onViewRecording,
+  onAddMeasurement
+}: Props) {
   const [recordingComplete, setRecordingComplete] = useState(false);
   const [recordingError, setRecordingError] = useState(false);
 
@@ -66,8 +81,11 @@ export default function RecordingScreen({onRecordingComplete, onViewRecording}: 
                 id: Date.now().toString(),
                 uri: uri,
                 createdAt: new Date().toISOString(),
-                x: null,
-                y: null,
+                roomName: roomName,
+                roomWidth: roomWidth,
+                roomLength: roomLength,
+                x: xPosition,
+                y: yPosition,
               });
 
               setRecordingComplete(true);
@@ -94,7 +112,15 @@ export default function RecordingScreen({onRecordingComplete, onViewRecording}: 
         clearTimeout(timer);
       }
     };
-  }, [recorder, onRecordingComplete]);
+  }, [
+    recorder,
+    onRecordingComplete,
+    roomName,
+    roomWidth,
+    roomLength,
+    xPosition,
+    yPosition
+  ]);
 
   if (recordingError) {
     return (
@@ -123,6 +149,13 @@ export default function RecordingScreen({onRecordingComplete, onViewRecording}: 
           title="View Recording"
           onPress={onViewRecording}
         />
+
+      <View style={styles.buttonSpacing}>
+        <Button
+          title="Add Another Measurement"
+          onPress={onAddMeasurement}
+        />
+      </View>
   
         <StatusBar style="auto" />
       </View>
@@ -131,7 +164,11 @@ export default function RecordingScreen({onRecordingComplete, onViewRecording}: 
 
   return (
     <View style={styles.container}>
-      <Text style={styles.clap}>CLAP!</Text>
+     <Text style={styles.clap}>MEASURING</Text>
+
+    <Text style={styles.description}>
+      Playing the test signal and recording the room response...
+    </Text>
 
       <Text style={styles.description}>
         Recording the sound that follows...
@@ -159,6 +196,10 @@ const styles = StyleSheet.create({
       ios: "Courier",
       android: "sans-serif-medium",
     }),
+  },
+
+  buttonSpacing: {
+    marginTop: 20,
   },
 
   clap: {

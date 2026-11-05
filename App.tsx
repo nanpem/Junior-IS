@@ -8,12 +8,26 @@ import InstructionsScreen from "./src/screens/InstructionsScreen";
 import CountdownScreen from "./src/screens/CountdownScreen";
 import RecordingScreen from "./src/screens/RecordingScreen";
 import ViewRecordingsScreen from "./src/screens/ViewRecordingsScreen";
+import PositionScreen from "./src/screens/PositionScreen";
+import RoomScreen from "./src/screens/RoomScreen";
 
 
-type Screen = | "home" | "instructions"| "countdown" | "recording" | "recordings";
+type Screen =
+  | "home"
+  | "instructions"
+  | "room"
+  | "position"
+  | "countdown"
+  | "recording"
+  | "recordings";
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>("home");
+  const [xPosition, setXPosition] = useState<number | null>(null);
+  const [yPosition, setYPosition] = useState<number | null>(null);
+  const [roomName, setRoomName] = useState("");
+  const [roomWidth, setRoomWidth] = useState<number | null>(null);
+  const [roomLength, setRoomLength] = useState<number | null>(null);
 
   function startMeasurement() {
     setScreen("instructions");
@@ -28,11 +42,11 @@ export default function App() {
         allowsRecording: true,
       });
   
-      setScreen("countdown");
+      setScreen("room");
     } else {
       Alert.alert(
         "Microphone Permission Required",
-        "Microphone access is needed to record the clap for room measurement."
+        "Microphone access is needed to record the room measurement."
       );
     }
   }
@@ -62,17 +76,49 @@ export default function App() {
   if (screen === "recording") {
     return (
       <RecordingScreen
+        roomName={roomName}
+        roomWidth={roomWidth!}
+        roomLength={roomLength!}
+        xPosition={xPosition!}
+        yPosition={yPosition!}
         onRecordingComplete={(uri) => {
           console.log("Saved measurement:", uri);
         }}
         onViewRecording={() => setScreen("recordings")}
+        onAddMeasurement={() => setScreen("position")}
       />
     );
   }
+
   if (screen === "recordings") {
     return (
       <ViewRecordingsScreen
         onBack={() => setScreen("home")}
+      />
+    );
+  }
+
+  if (screen === "room") {
+    return (
+      <RoomScreen
+        onContinue={(name, width, length) => {
+          setRoomName(name);
+          setRoomWidth(width);
+          setRoomLength(length);
+          setScreen("position");
+        }}
+      />
+    );
+  }
+
+  if (screen === "position") {
+    return (
+      <PositionScreen
+        onContinue={(x, y) => {
+          setXPosition(x);
+          setYPosition(y);
+          setScreen("countdown");
+        }}
       />
     );
   }
