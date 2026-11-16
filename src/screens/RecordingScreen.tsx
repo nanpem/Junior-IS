@@ -8,10 +8,13 @@ import {
   View,
 } from "react-native";
 import {
-  RecordingPresets,
-  useAudioRecorder,
-  setAudioModeAsync
-} from "expo-audio";
+  AudioManager,
+  AudioRecorder,
+  FileDirectory,
+  FileFormat,
+  FilePreset,
+} from "react-native-audio-api";
+
 import { playSweep } from "../audio/playSweep";
 import { saveMeasurement } from "../storage/measurementStorage";
 
@@ -26,6 +29,22 @@ type Props = {
   onAddMeasurement: () => void;
 };
 
+AudioManager.setAudioSessionOptions({
+  iosCategory: "playAndRecord",
+  iosMode: "default",
+  iosOptions: ["defaultToSpeaker"],
+});
+
+const audioRecorder =
+  new AudioRecorder();
+
+audioRecorder.enableFileOutput({
+  format: FileFormat.Wav,
+  preset: FilePreset.Lossless,
+  directory: FileDirectory.Document,
+  channelCount: 1,
+});
+
 export default function RecordingScreen({
   roomName,
   roomWidth,
@@ -34,17 +53,20 @@ export default function RecordingScreen({
   yPosition,
   onRecordingComplete,
   onViewRecording,
-  onAddMeasurement
+  onAddMeasurement,
 }: Props) {
-  const [recordingComplete, setRecordingComplete] = useState(false);
-  const [recordingError, setRecordingError] = useState(false);
+  const [
+    recordingComplete,
+    setRecordingComplete,
+  ] = useState(false);
 
-  const hasStarted = useRef(false);
+  const [
+    recordingError,
+    setRecordingError,
+  ] = useState(false);
 
-  const recorder = useAudioRecorder({
-    ...RecordingPresets.HIGH_QUALITY,
-    directory: "document",
-  });
+  const hasStarted =
+    useRef(false);
 
   useEffect(() => {
     if (hasStarted.current) {
@@ -53,54 +75,120 @@ export default function RecordingScreen({
 
     hasStarted.current = true;
 
-    let timer: ReturnType<typeof setTimeout>;
+    let recordingTimer:
+      ReturnType<typeof setTimeout>;
+
+    let sweepTimer:
+      ReturnType<typeof setTimeout>;
 
     async function startRecording() {
       try {
-        await setAudioModeAsync({
-          allowsRecording: true,
-          playsInSilentMode: true,
-        });
-        await recorder.prepareToRecordAsync();
+        await AudioManager
+          .setAudioSessionActivity(true);
 
-        recorder.record();
-        setTimeout(() => {
-          playSweep();
-        }, 500);
+        const startResult =
+          await audioRecorder.start();
 
-        console.log("Recording started");
+        if (
+          startResult.status ===
+          "error"
+        ) {
+          setRecordingError(true);
 
-        timer = setTimeout(async () => {
-          try {
-            await recorder.stop();
+          return;
+        }
 
-            const uri = recorder.uri;
+        sweepTimer =
+          setTimeout(() => {
+            playSweep();
+          }, 500);
 
-            if (uri) {
-              await saveMeasurement({
-                id: Date.now().toString(),
-                uri: uri,
-                createdAt: new Date().toISOString(),
-                roomName: roomName,
-                roomWidth: roomWidth,
-                roomLength: roomLength,
-                x: xPosition,
-                y: yPosition,
-              });
+        recordingTimer =
+          setTimeout(
+            async () => {
+              try {
+                const stopResult =
+                  await audioRecorder.stop();
 
-              setRecordingComplete(true);
-              onRecordingComplete(uri);
-            } 
-            else {
-              setRecordingError(true);
-            }
-          } catch (error) {
-            console.log("Error stopping recording:", error);
-            setRecordingError(true);
-          }
-        }, 5000);
+                if (
+                  stopResult.status ===
+                  "error"
+                ) {
+                  await AudioManager
+                    .setAudioSessionActivity(
+                      false
+                    );
+
+                  setRecordingError(
+                    true
+                  );
+
+                  return;
+                }
+
+                const path =
+                  stopResult.paths[0];
+
+                if (!path) {
+                  await AudioManager
+                    .setAudioSessionActivity(
+                      false
+                    );
+
+                  setRecordingError(
+                    true
+                  );
+
+                  return;
+                }
+
+                const uri =
+                  path.startsWith(
+                    "file://"
+                  )
+                    ? path
+                    : "file://" +
+                      path;
+
+                await saveMeasurement({
+                  id:
+                    Date.now()
+                      .toString(),
+                  uri: uri,
+                  createdAt:
+                    new Date()
+                      .toISOString(),
+                  roomName:
+                    roomName,
+                  roomWidth:
+                    roomWidth,
+                  roomLength:
+                    roomLength,
+                  x: xPosition,
+                  y: yPosition,
+                });
+
+                await AudioManager
+                  .setAudioSessionActivity(
+                    false
+                  );
+
+                setRecordingComplete(
+                  true
+                );
+
+                onRecordingComplete(
+                  uri
+                );
+              } catch (error) {
+                setRecordingError(
+                  true
+                );
+              }
+            },
+            8000
+          );
       } catch (error) {
-        console.log("Error starting recording:", error);
         setRecordingError(true);
       }
     }
@@ -108,27 +196,39 @@ export default function RecordingScreen({
     startRecording();
 
     return () => {
-      if (timer) {
-        clearTimeout(timer);
+      if (sweepTimer) {
+        clearTimeout(
+          sweepTimer
+        );
+      }
+
+      if (recordingTimer) {
+        clearTimeout(
+          recordingTimer
+        );
       }
     };
   }, [
-    recorder,
     onRecordingComplete,
     roomName,
     roomWidth,
     roomLength,
     xPosition,
-    yPosition
+    yPosition,
   ]);
 
   if (recordingError) {
     return (
       <View style={styles.container}>
-        <Text style={styles.title}>Recording Error</Text>
+        <Text style={styles.title}>
+          Recording Error
+        </Text>
 
-        <Text style={styles.description}>
-          The room measurement could not be recorded.
+        <Text
+          style={styles.description}
+        >
+          The room measurement
+          could not be recorded.
         </Text>
 
         <StatusBar style="auto" />
@@ -139,24 +239,37 @@ export default function RecordingScreen({
   if (recordingComplete) {
     return (
       <View style={styles.container}>
-        <Text style={styles.title}>Recording Complete</Text>
-  
-        <Text style={styles.description}>
-          The room measurement was successfully recorded.
+        <Text style={styles.title}>
+          Recording Complete
         </Text>
-  
+
+        <Text
+          style={styles.description}
+        >
+          The room measurement was
+          successfully recorded.
+        </Text>
+
         <Button
           title="View Recording"
-          onPress={onViewRecording}
+          onPress={
+            onViewRecording
+          }
         />
 
-      <View style={styles.buttonSpacing}>
-        <Button
-          title="Add Another Measurement"
-          onPress={onAddMeasurement}
-        />
-      </View>
-  
+        <View
+          style={
+            styles.buttonSpacing
+          }
+        >
+          <Button
+            title="Add Another Measurement"
+            onPress={
+              onAddMeasurement
+            }
+          />
+        </View>
+
         <StatusBar style="auto" />
       </View>
     );
@@ -164,14 +277,16 @@ export default function RecordingScreen({
 
   return (
     <View style={styles.container}>
-     <Text style={styles.clap}>MEASURING</Text>
+      <Text style={styles.clap}>
+        MEASURING
+      </Text>
 
-    <Text style={styles.description}>
-      Playing the test signal and recording the room response...
-    </Text>
-
-      <Text style={styles.description}>
-        Recording the sound that follows...
+      <Text
+        style={styles.description}
+      >
+        Playing the test signal
+        and recording the room
+        response...
       </Text>
 
       <StatusBar style="auto" />
@@ -179,46 +294,55 @@ export default function RecordingScreen({
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 30,
-  },
+const styles =
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      justifyContent:
+        "center",
+      alignItems:
+        "center",
+      padding: 30,
+    },
 
-  title: {
-    fontSize: 30,
-    fontWeight: "bold",
-    textAlign: "center",
-    marginBottom: 25,
-    fontFamily: Platform.select({
-      ios: "Courier",
-      android: "sans-serif-medium",
-    }),
-  },
+    title: {
+      fontSize: 30,
+      fontWeight: "bold",
+      textAlign: "center",
+      marginBottom: 25,
+      fontFamily:
+        Platform.select({
+          ios: "Courier",
+          android:
+            "sans-serif-medium",
+        }),
+    },
 
-  buttonSpacing: {
-    marginTop: 20,
-  },
+    buttonSpacing: {
+      marginTop: 20,
+    },
 
-  clap: {
-    fontSize: 70,
-    fontWeight: "bold",
-    textAlign: "center",
-    marginBottom: 25,
-    fontFamily: Platform.select({
-      ios: "Courier",
-      android: "sans-serif-medium",
-    }),
-  },
+    clap: {
+      fontSize: 70,
+      fontWeight: "bold",
+      textAlign: "center",
+      marginBottom: 25,
+      fontFamily:
+        Platform.select({
+          ios: "Courier",
+          android:
+            "sans-serif-medium",
+        }),
+    },
 
-  description: {
-    fontSize: 16,
-    textAlign: "center",
-    fontFamily: Platform.select({
-      ios: "Courier",
-      android: "sans-serif-medium",
-    }),
-  },
-});
+    description: {
+      fontSize: 16,
+      textAlign: "center",
+      fontFamily:
+        Platform.select({
+          ios: "Courier",
+          android:
+            "sans-serif-medium",
+        }),
+    },
+  });

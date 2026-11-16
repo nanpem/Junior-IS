@@ -17,7 +17,12 @@ export async function getMeasurements(): Promise<Measurement[]> {
     return [];
   }
 
-  return JSON.parse(text);
+  const measurements: Measurement[] = JSON.parse(text);
+
+  return measurements.filter((measurement) => {
+    const file = new File(measurement.uri);
+    return file.exists;
+  });
 }
 
 export async function saveMeasurement(
