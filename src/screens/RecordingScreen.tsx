@@ -7,6 +7,9 @@ import {
   Text,
   View,
 } from "react-native";
+
+import * as Sharing from "expo-sharing";
+
 import {
   AudioManager,
   AudioRecorder,
@@ -15,7 +18,6 @@ import {
   FilePreset,
 } from "react-native-audio-api";
 
-import { playSweep } from "../audio/playSweep";
 import { saveMeasurement } from "../storage/measurementStorage";
 
 type Props = {
@@ -30,9 +32,9 @@ type Props = {
 };
 
 AudioManager.setAudioSessionOptions({
-  iosCategory: "playAndRecord",
-  iosMode: "default",
-  iosOptions: ["defaultToSpeaker"],
+  iosCategory: "record",
+  iosMode: "measurement",
+  iosOptions: [],
 });
 
 const audioRecorder =
@@ -65,8 +67,36 @@ export default function RecordingScreen({
     setRecordingError,
   ] = useState(false);
 
+  const [
+    recordingUri,
+    setRecordingUri,
+  ] = useState<string | null>(
+    null
+  );
+
   const hasStarted =
     useRef(false);
+
+  async function exportRecording() {
+    if (!recordingUri) {
+      return;
+    }
+
+    const available =
+      await Sharing.isAvailableAsync();
+
+    if (!available) {
+      return;
+    }
+
+    await Sharing.shareAsync(
+      recordingUri,
+      {
+        mimeType: "audio/wav",
+        UTI: "com.microsoft.waveform-audio",
+      }
+    );
+  }
 
   useEffect(() => {
     if (hasStarted.current) {
@@ -78,13 +108,12 @@ export default function RecordingScreen({
     let recordingTimer:
       ReturnType<typeof setTimeout>;
 
-    let sweepTimer:
-      ReturnType<typeof setTimeout>;
-
     async function startRecording() {
       try {
         await AudioManager
-          .setAudioSessionActivity(true);
+          .setAudioSessionActivity(
+            true
+          );
 
         const startResult =
           await audioRecorder.start();
@@ -97,11 +126,6 @@ export default function RecordingScreen({
 
           return;
         }
-
-        sweepTimer =
-          setTimeout(() => {
-            playSweep();
-          }, 500);
 
         recordingTimer =
           setTimeout(
@@ -173,6 +197,10 @@ export default function RecordingScreen({
                     false
                   );
 
+                setRecordingUri(
+                  uri
+                );
+
                 setRecordingComplete(
                   true
                 );
@@ -196,12 +224,6 @@ export default function RecordingScreen({
     startRecording();
 
     return () => {
-      if (sweepTimer) {
-        clearTimeout(
-          sweepTimer
-        );
-      }
-
       if (recordingTimer) {
         clearTimeout(
           recordingTimer
@@ -251,11 +273,24 @@ export default function RecordingScreen({
         </Text>
 
         <Button
-          title="View Recording"
+          title="Export Recording"
           onPress={
-            onViewRecording
+            exportRecording
           }
         />
+
+        <View
+          style={
+            styles.buttonSpacing
+          }
+        >
+          <Button
+            title="View Recording"
+            onPress={
+              onViewRecording
+            }
+          />
+        </View>
 
         <View
           style={
@@ -284,9 +319,9 @@ export default function RecordingScreen({
       <Text
         style={styles.description}
       >
-        Playing the test signal
-        and recording the room
-        response...
+        Recording the room response.
+        Play the test signal from
+        the Mac.
       </Text>
 
       <StatusBar style="auto" />
@@ -338,6 +373,7 @@ const styles =
     description: {
       fontSize: 16,
       textAlign: "center",
+      marginBottom: 25,
       fontFamily:
         Platform.select({
           ios: "Courier",

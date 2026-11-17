@@ -1,5 +1,12 @@
-import { useEffect, useState } from "react";
-import { StatusBar } from "expo-status-bar";
+import {
+  useEffect,
+  useState,
+} from "react";
+
+import {
+  StatusBar,
+} from "expo-status-bar";
+
 import {
   Alert,
   Button,
@@ -8,16 +15,33 @@ import {
   Text,
   View,
 } from "react-native";
+
 import {
   setAudioModeAsync,
   useAudioPlayer,
 } from "expo-audio";
-import { File } from "expo-file-system";
 
-import { Measurement } from "../types/Measurement";
-import { getMeasurements } from "../storage/measurementStorage";
-import { getRecordingSamples } from "../analysis/audioAnalysis";
-import { estimateRT60 } from "../analysis/rt60";
+import {
+  File,
+} from "expo-file-system";
+
+import * as DocumentPicker from "expo-document-picker";
+
+import {
+  Measurement,
+} from "../types/Measurement";
+
+import {
+  getMeasurements,
+} from "../storage/measurementStorage";
+
+import {
+  getRecordingSamples,
+} from "../analysis/audioAnalysis";
+
+import {
+  estimateRT60,
+} from "../analysis/rt60";
 
 type Props = {
   onBack: () => void;
@@ -41,21 +65,22 @@ export default function ViewRecordingsScreen({
     useState("");
 
   const [
+    testAnalysisInfo,
+    setTestAnalysisInfo,
+  ] =
+    useState("");
+
+  const [
     analyzedMeasurementId,
     setAnalyzedMeasurementId,
   ] =
     useState("");
 
   const [
-    decayPoints,
-    setDecayPoints,
+    analyzingMeasurementId,
+    setAnalyzingMeasurementId,
   ] =
-    useState<
-      {
-        time: number;
-        db: number;
-      }[]
-    >([]);
+    useState("");
 
   const player =
     useAudioPlayer(null);
@@ -72,6 +97,139 @@ export default function ViewRecordingsScreen({
 
     loadMeasurements();
   }, []);
+
+  function formatAnalysis(
+    analysis: NonNullable<
+      ReturnType<
+        typeof estimateRT60
+      >
+    >
+  ) {
+    return (
+      "500 Hz RT60: " +
+      analysis.rt60500.toFixed(
+        3
+      ) +
+      " s\n" +
+
+      "1000 Hz RT60: " +
+      analysis.rt601000.toFixed(
+        3
+      ) +
+      " s\n" +
+
+      "Mid RT60: " +
+      analysis.midRT60.toFixed(
+        3
+      ) +
+      " s\n\n" +
+
+      "500 Hz R²: " +
+      analysis.rSquared500.toFixed(
+        3
+      ) +
+      "\n" +
+
+      "1000 Hz R²: " +
+      analysis.rSquared1000.toFixed(
+        3
+      ) +
+      "\n\n" +
+
+      "Sweep start: " +
+      analysis.sweepStart.toFixed(
+        3
+      ) +
+      " s\n" +
+
+      "Impulse peak: " +
+      analysis.impulsePeak.toFixed(
+        3
+      ) +
+      " s"
+    );
+  }
+
+  async function importTestRecording() {
+    try {
+      const result =
+        await DocumentPicker
+          .getDocumentAsync({
+            type: [
+              "audio/wav",
+              "audio/x-wav",
+              "audio/wave",
+            ],
+
+            copyToCacheDirectory:
+              true,
+
+            multiple: false,
+          });
+
+      if (result.canceled) {
+        return;
+      }
+
+      const uri =
+        result.assets[0].uri;
+
+      setTestAnalysisInfo(
+        "Analyzing..."
+      );
+
+      const audio =
+        await getRecordingSamples(
+          uri
+        );
+
+      const analysis =
+        estimateRT60(
+          audio.samples,
+          audio.sampleRate
+        );
+
+      if (!analysis) {
+        setTestAnalysisInfo(
+          ""
+        );
+
+        Alert.alert(
+          "Analysis Error",
+          "The imported recording could not be analyzed."
+        );
+
+        return;
+      }
+
+      const formatted =
+        formatAnalysis(
+          analysis
+        );
+
+      setTestAnalysisInfo(
+        formatted
+      );
+
+      Alert.alert(
+        "Test Analysis Complete",
+        "Mid RT60: " +
+          analysis.midRT60.toFixed(
+            3
+          ) +
+          " seconds"
+      );
+    } catch (error) {
+      setTestAnalysisInfo(
+        ""
+      );
+
+      Alert.alert(
+        "Import Error",
+        String(error)
+      );
+    }
+  }
 
   async function playRecording(
     uri: string
@@ -92,6 +250,7 @@ export default function ViewRecordingsScreen({
       await setAudioModeAsync({
         allowsRecording:
           false,
+
         playsInSilentMode:
           true,
       });
@@ -114,12 +273,20 @@ export default function ViewRecordingsScreen({
       Measurement
   ) {
     try {
+      setAnalyzingMeasurementId(
+        measurement.id
+      );
+
       const file =
         new File(
           measurement.uri
         );
 
       if (!file.exists) {
+        setAnalyzingMeasurementId(
+          ""
+        );
+
         Alert.alert(
           "Analysis Error",
           "The recording file does not exist."
@@ -139,47 +306,23 @@ export default function ViewRecordingsScreen({
           audio.sampleRate
         );
 
-      if (
-        analysis === null
-      ) {
+      if (!analysis) {
+        setAnalyzingMeasurementId(
+          ""
+        );
+
         Alert.alert(
           "Analysis Error",
-          "There was not enough usable decay to estimate RT60."
+          "The recording could not be analyzed."
         );
 
         return;
       }
 
       const result =
-        "Estimated RT60: " +
-        analysis.rt60.toFixed(
-          2
-        ) +
-        " seconds\n" +
-        "Decay slope: " +
-        analysis.slope.toFixed(
-          2
-        ) +
-        " dB/s\n" +
-        "R²: " +
-        analysis.rSquared.toFixed(
-          3
-        ) +
-        "\nT20 start: " +
-        analysis.startTime.toFixed(
-          2
-        ) +
-        " s\n" +
-        "T20 end: " +
-        analysis.endTime.toFixed(
-          2
-        ) +
-        " s\n" +
-        "Noise cutoff: " +
-        analysis.noiseCutoffTime.toFixed(
-          2
-        ) +
-        " s";
+        formatAnalysis(
+          analysis
+        );
 
       setAnalysisInfo(
         result
@@ -189,15 +332,23 @@ export default function ViewRecordingsScreen({
         measurement.id
       );
 
-      setDecayPoints(
-        analysis.decayPoints
+      setAnalyzingMeasurementId(
+        ""
       );
 
       Alert.alert(
         "Analysis Complete",
-        result
+        "Mid RT60: " +
+          analysis.midRT60.toFixed(
+            3
+          ) +
+          " seconds"
       );
     } catch (error) {
+      setAnalyzingMeasurementId(
+        ""
+      );
+
       Alert.alert(
         "Analysis Error",
         String(error)
@@ -213,10 +364,46 @@ export default function ViewRecordingsScreen({
       contentInsetAdjustmentBehavior="automatic"
     >
       <Text
-        style={styles.title}
+        style={
+          styles.title
+        }
       >
         View Recordings
       </Text>
+
+      <View
+        style={
+          styles.testSection
+        }
+      >
+        <Text
+          style={
+            styles.testTitle
+          }
+        >
+          Validation Test
+        </Text>
+
+        <Button
+          title="Import Test Recording"
+          onPress={
+            importTestRecording
+          }
+        />
+
+        {testAnalysisInfo !==
+          "" && (
+          <Text
+            style={
+              styles.analysisInfo
+            }
+          >
+            {
+              testAnalysisInfo
+            }
+          </Text>
+        )}
+      </View>
 
       {measurements.length ===
       0 ? (
@@ -309,7 +496,16 @@ export default function ViewRecordingsScreen({
                 }
               >
                 <Button
-                  title="Analyze Recording"
+                  title={
+                    analyzingMeasurementId ===
+                    measurement.id
+                      ? "Analyzing..."
+                      : "Analyze Recording"
+                  }
+                  disabled={
+                    analyzingMeasurementId ===
+                    measurement.id
+                  }
                   onPress={() =>
                     analyzeRecording(
                       measurement
@@ -322,120 +518,28 @@ export default function ViewRecordingsScreen({
                 measurement.id &&
                 analysisInfo !==
                   "" && (
-                  <Text
-                    style={
-                      styles.analysisInfo
-                    }
-                  >
-                    {
-                      analysisInfo
-                    }
-                  </Text>
-                )}
-
-              {analyzedMeasurementId ===
-                measurement.id &&
-                decayPoints.length >
-                  0 && (
                   <View
                     style={
-                      styles.chartContainer
+                      styles.resultBox
                     }
                   >
                     <Text
                       style={
-                        styles.chartTitle
+                        styles.resultTitle
                       }
                     >
-                      Energy
-                      Decay Curve
+                      Acoustic Analysis
                     </Text>
 
-                    <View
+                    <Text
                       style={
-                        styles.chart
+                        styles.analysisInfo
                       }
                     >
-                      <Text
-                        style={
-                          styles.zeroLabel
-                        }
-                      >
-                        0 dB
-                      </Text>
-
-                      <Text
-                        style={
-                          styles.minusFiveLabel
-                        }
-                      >
-                        -5 dB
-                      </Text>
-
-                      <Text
-                        style={
-                          styles.minusTwentyFiveLabel
-                        }
-                      >
-                        -25 dB
-                      </Text>
-
-                      <Text
-                        style={
-                          styles.minusSixtyLabel
-                        }
-                      >
-                        -60 dB
-                      </Text>
-
-                      {decayPoints.map(
-                        (
-                          point,
-                          pointIndex
-                        ) => {
-                          const maximumTime =
-                            decayPoints[
-                              decayPoints.length -
-                                1
-                            ].time;
-
-                          const left =
-                            maximumTime ===
-                            0
-                              ? 0
-                              : (
-                                  point.time /
-                                  maximumTime
-                                ) *
-                                100;
-
-                          const top =
-                            (
-                              Math.abs(
-                                point.db
-                              ) /
-                              60
-                            ) *
-                            150;
-
-                          return (
-                            <View
-                              key={
-                                pointIndex
-                              }
-                              style={[
-                                styles.decayPoint,
-                                {
-                                  left: `${left}%`,
-                                  top:
-                                    top,
-                                },
-                              ]}
-                            />
-                          );
-                        }
-                      )}
-                    </View>
+                      {
+                        analysisInfo
+                      }
+                    </Text>
                   </View>
                 )}
             </View>
@@ -450,11 +554,15 @@ export default function ViewRecordingsScreen({
       >
         <Button
           title="Back"
-          onPress={onBack}
+          onPress={
+            onBack
+          }
         />
       </View>
 
-      <StatusBar style="auto" />
+      <StatusBar
+        style="auto"
+      />
     </ScrollView>
   );
 }
@@ -473,6 +581,19 @@ const styles =
       marginBottom: 30,
     },
 
+    testSection: {
+      padding: 20,
+      borderWidth: 1,
+      borderRadius: 10,
+      marginBottom: 30,
+    },
+
+    testTitle: {
+      fontSize: 20,
+      fontWeight: "bold",
+      marginBottom: 15,
+    },
+
     recordingCard: {
       padding: 20,
       borderWidth: 1,
@@ -488,72 +609,30 @@ const styles =
 
     recordingInfo: {
       fontSize: 16,
-      marginBottom: 20,
+      marginBottom: 12,
     },
 
     buttonSpacing: {
       marginTop: 15,
     },
 
-    analysisInfo: {
-      fontSize: 16,
+    resultBox: {
       marginTop: 20,
-      lineHeight: 24,
+      padding: 15,
+      borderWidth: 1,
+      borderRadius: 8,
     },
 
-    chartContainer: {
-      marginTop: 25,
-    },
-
-    chartTitle: {
+    resultTitle: {
       fontSize: 18,
       fontWeight: "bold",
       marginBottom: 10,
     },
 
-    chart: {
-      height: 170,
-      borderLeftWidth: 1,
-      borderBottomWidth: 1,
-      marginLeft: 50,
-      position: "relative",
-    },
-
-    decayPoint: {
-      position: "absolute",
-      width: 3,
-      height: 3,
-      borderRadius: 2,
-      backgroundColor:
-        "black",
-    },
-
-    zeroLabel: {
-      position: "absolute",
-      left: -42,
-      top: -8,
-      fontSize: 12,
-    },
-
-    minusFiveLabel: {
-      position: "absolute",
-      left: -42,
-      top: 5,
-      fontSize: 12,
-    },
-
-    minusTwentyFiveLabel: {
-      position: "absolute",
-      left: -48,
-      top: 55,
-      fontSize: 12,
-    },
-
-    minusSixtyLabel: {
-      position: "absolute",
-      left: -48,
-      bottom: -7,
-      fontSize: 12,
+    analysisInfo: {
+      fontSize: 16,
+      lineHeight: 25,
+      marginTop: 15,
     },
 
     backButton: {

@@ -1,5 +1,88 @@
 import FFT from "fft.js";
 
+const SWEEP_DURATION = 2;
+const START_FREQUENCY = 200;
+const END_FREQUENCY = 8000;
+
+type SOS = [
+  number,
+  number,
+  number,
+  number,
+  number,
+  number
+];
+
+const SOS_500: SOS[] = [
+  [
+    2.7008539643187137e-7,
+    5.4017079286374275e-7,
+    2.7008539643187137e-7,
+    1,
+    -1.9467977986638063,
+    0.9523568057434735,
+  ],
+  [
+    1,
+    2,
+    1,
+    1,
+    -1.9607827914789351,
+    0.9639455998661062,
+  ],
+  [
+    1,
+    -2,
+    1,
+    1,
+    -1.968945254948772,
+    0.9770301487236029,
+  ],
+  [
+    1,
+    -2,
+    1,
+    1,
+    -1.9856711353336083,
+    0.9878993191713733,
+  ],
+];
+
+const SOS_1000: SOS[] = [
+  [
+    4.076353113570579e-6,
+    8.152706227141158e-6,
+    4.076353113570579e-6,
+    1,
+    -1.8852476795739006,
+    0.9069483987680177,
+  ],
+  [
+    1,
+    2,
+    1,
+    1,
+    -1.9166859881097214,
+    0.9291065993944077,
+  ],
+  [
+    1,
+    -2,
+    1,
+    1,
+    -1.9227527407359077,
+    0.9546647771369348,
+  ],
+  [
+    1,
+    -2,
+    1,
+    1,
+    -1.9670646099666076,
+    0.9759188943038697,
+  ],
+];
+
 function nextPowerOfTwo(
   value: number
 ) {
@@ -12,35 +95,71 @@ function nextPowerOfTwo(
   return size;
 }
 
+function normalize(
+  signal: ArrayLike<number>
+) {
+  let maximum = 0;
+
+  for (
+    let i = 0;
+    i < signal.length;
+    i++
+  ) {
+    const value =
+      Math.abs(signal[i]);
+
+    if (value > maximum) {
+      maximum = value;
+    }
+  }
+
+  const result =
+    new Float64Array(
+      signal.length
+    );
+
+  if (maximum === 0) {
+    return result;
+  }
+
+  for (
+    let i = 0;
+    i < signal.length;
+    i++
+  ) {
+    result[i] =
+      signal[i] /
+      maximum;
+  }
+
+  return result;
+}
+
 function generateSweep(
   sampleRate: number
 ) {
-  const duration = 2;
-
-  const startFrequency =
-    200;
-
-  const endFrequency =
-    8000;
-
   const length =
     Math.floor(
-      duration *
-      sampleRate
+      SWEEP_DURATION *
+        sampleRate
     );
 
   const sweep =
-    new Array<number>(
-      length
-    );
+    new Float64Array(length);
 
   const frequencyRatio =
-    endFrequency /
-    startFrequency;
+    END_FREQUENCY /
+    START_FREQUENCY;
 
   const logRatio =
     Math.log(
       frequencyRatio
+    );
+
+  const fadeSamples =
+    Math.floor(
+      0.02 *
+        sampleRate
     );
 
   for (
@@ -55,36 +174,40 @@ function generateSweep(
       (
         2 *
         Math.PI *
-        startFrequency *
-        duration /
+        START_FREQUENCY *
+        SWEEP_DURATION /
         logRatio
       ) *
       (
         Math.exp(
           logRatio *
-          time /
-          duration
+            time /
+            SWEEP_DURATION
         ) - 1
       );
 
     let gain = 0.5;
 
-    if (time < 0.02) {
-      gain =
-        0.5 *
-        (time / 0.02);
+    if (
+      i < fadeSamples
+    ) {
+      gain *=
+        i /
+        fadeSamples;
     }
 
     if (
-      time >
-      duration - 0.02
+      i >=
+      length -
+        fadeSamples
     ) {
-      gain =
-        0.5 *
+      gain *=
         (
-          (duration - time) /
-          0.02
-        );
+          length -
+          1 -
+          i
+        ) /
+        fadeSamples;
     }
 
     sweep[i] =
@@ -95,481 +218,643 @@ function generateSweep(
   return sweep;
 }
 
-function getImpulseResponse(
-  recording: Float32Array,
-  sampleRate: number
+function fftConvolve(
+  first: ArrayLike<number>,
+  second: ArrayLike<number>
 ) {
-  const sweep =
-    generateSweep(
-      sampleRate
-    );
+  const outputLength =
+    first.length +
+    second.length -
+    1;
 
   const fftSize =
     nextPowerOfTwo(
-      recording.length +
-      sweep.length
+      outputLength
     );
 
   const fft =
-    new FFT(
-      fftSize
-    );
+    new FFT(fftSize);
 
-  const recordingInput =
-    new Array(
+  const firstInput =
+    new Array<number>(
       fftSize
     ).fill(0);
 
-  const sweepInput =
-    new Array(
+  const secondInput =
+    new Array<number>(
       fftSize
     ).fill(0);
 
   for (
     let i = 0;
-    i < recording.length;
+    i < first.length;
     i++
   ) {
-    recordingInput[i] =
-      recording[i];
+    firstInput[i] =
+      first[i];
   }
+
+  for (
+    let i = 0;
+    i < second.length;
+    i++
+  ) {
+    secondInput[i] =
+      second[i];
+  }
+
+  const firstSpectrum =
+    fft.createComplexArray();
+
+  const secondSpectrum =
+    fft.createComplexArray();
+
+  fft.realTransform(
+    firstSpectrum,
+    firstInput
+  );
+
+  fft.completeSpectrum(
+    firstSpectrum
+  );
+
+  fft.realTransform(
+    secondSpectrum,
+    secondInput
+  );
+
+  fft.completeSpectrum(
+    secondSpectrum
+  );
+
+  const resultSpectrum =
+    fft.createComplexArray();
+
+  for (
+    let i = 0;
+    i < fftSize;
+    i++
+  ) {
+    const firstReal =
+      firstSpectrum[
+        2 * i
+      ];
+
+    const firstImaginary =
+      firstSpectrum[
+        2 * i + 1
+      ];
+
+    const secondReal =
+      secondSpectrum[
+        2 * i
+      ];
+
+    const secondImaginary =
+      secondSpectrum[
+        2 * i + 1
+      ];
+
+    resultSpectrum[
+      2 * i
+    ] =
+      firstReal *
+        secondReal -
+      firstImaginary *
+        secondImaginary;
+
+    resultSpectrum[
+      2 * i + 1
+    ] =
+      firstReal *
+        secondImaginary +
+      firstImaginary *
+        secondReal;
+  }
+
+  const resultComplex =
+    fft.createComplexArray();
+
+  fft.inverseTransform(
+    resultComplex,
+    resultSpectrum
+  );
+
+  const result =
+    new Float64Array(
+      outputLength
+    );
+
+  for (
+    let i = 0;
+    i < outputLength;
+    i++
+  ) {
+    result[i] =
+      resultComplex[
+        2 * i
+      ];
+  }
+
+  return result;
+}
+
+function findSweepStart(
+  recording:
+    Float64Array,
+  sweep:
+    Float64Array
+) {
+  const reversedSweep =
+    new Float64Array(
+      sweep.length
+    );
 
   for (
     let i = 0;
     i < sweep.length;
     i++
   ) {
-    sweepInput[i] =
-      sweep[i];
+    reversedSweep[i] =
+      sweep[
+        sweep.length -
+        1 -
+        i
+      ];
   }
 
-  const recordingSpectrum =
-    fft.createComplexArray();
+  const convolution =
+    fftConvolve(
+      recording,
+      reversedSweep
+    );
 
-  const sweepSpectrum =
-    fft.createComplexArray();
+  const validLength =
+    recording.length -
+    sweep.length +
+    1;
 
-  fft.realTransform(
-    recordingSpectrum,
-    recordingInput
-  );
+  if (
+    validLength <= 0
+  ) {
+    return -1;
+  }
 
-  fft.completeSpectrum(
-    recordingSpectrum
-  );
-
-  fft.realTransform(
-    sweepSpectrum,
-    sweepInput
-  );
-
-  fft.completeSpectrum(
-    sweepSpectrum
-  );
-
-  let maximumPower = 0;
+  let bestIndex = 0;
+  let bestValue = 0;
 
   for (
     let i = 0;
-    i < fftSize;
+    i < validLength;
     i++
   ) {
-    const real =
-      sweepSpectrum[
-        2 * i
-      ];
+    const convolutionIndex =
+      i +
+      sweep.length -
+      1;
 
-    const imaginary =
-      sweepSpectrum[
-        2 * i + 1
-      ];
-
-    const power =
-      real * real +
-      imaginary *
-      imaginary;
+    const value =
+      Math.abs(
+        convolution[
+          convolutionIndex
+        ]
+      );
 
     if (
-      power >
-      maximumPower
+      value >
+      bestValue
     ) {
-      maximumPower =
-        power;
+      bestValue = value;
+      bestIndex = i;
     }
   }
 
-  const epsilon =
-    maximumPower *
-    0.00000001;
-
-  const responseSpectrum =
-    fft.createComplexArray();
-
-  for (
-    let i = 0;
-    i < fftSize;
-    i++
-  ) {
-    const recordingReal =
-      recordingSpectrum[
-        2 * i
-      ];
-
-    const recordingImaginary =
-      recordingSpectrum[
-        2 * i + 1
-      ];
-
-    const sweepReal =
-      sweepSpectrum[
-        2 * i
-      ];
-
-    const sweepImaginary =
-      sweepSpectrum[
-        2 * i + 1
-      ];
-
-    const denominator =
-      sweepReal *
-        sweepReal +
-      sweepImaginary *
-        sweepImaginary +
-      epsilon;
-
-    responseSpectrum[
-      2 * i
-    ] =
-      (
-        recordingReal *
-          sweepReal +
-        recordingImaginary *
-          sweepImaginary
-      ) /
-      denominator;
-
-    responseSpectrum[
-      2 * i + 1
-    ] =
-      (
-        recordingImaginary *
-          sweepReal -
-        recordingReal *
-          sweepImaginary
-      ) /
-      denominator;
-  }
-
-  const impulseComplex =
-    fft.createComplexArray();
-
-  fft.inverseTransform(
-    impulseComplex,
-    responseSpectrum
-  );
-
-  const impulse =
-    new Float32Array(
-      fftSize
-    );
-
-  for (
-    let i = 0;
-    i < fftSize;
-    i++
-  ) {
-    impulse[i] =
-      impulseComplex[
-        2 * i
-      ];
-  }
-
-  return impulse;
+  return bestIndex;
 }
 
-export function estimateRT60(
-  recording: Float32Array,
+function createInverseFilter(
+  sweep:
+    Float64Array,
   sampleRate: number
 ) {
-  const impulse =
-    getImpulseResponse(
-      recording,
+  const inverse =
+    new Float64Array(
+      sweep.length
+    );
+
+  const L =
+    SWEEP_DURATION /
+    Math.log(
+      END_FREQUENCY /
+        START_FREQUENCY
+    );
+
+  let maximum = 0;
+
+  for (
+    let i = 0;
+    i < sweep.length;
+    i++
+  ) {
+    const time =
+      i / sampleRate;
+
+    const value =
+      sweep[
+        sweep.length -
+        1 -
+        i
+      ] *
+      Math.exp(
+        -time / L
+      );
+
+    inverse[i] = value;
+
+    const absolute =
+      Math.abs(value);
+
+    if (
+      absolute >
+      maximum
+    ) {
+      maximum = absolute;
+    }
+  }
+
+  if (
+    maximum > 0
+  ) {
+    for (
+      let i = 0;
+      i <
+      inverse.length;
+      i++
+    ) {
+      inverse[i] /=
+        maximum;
+    }
+  }
+
+  return inverse;
+}
+
+function getImpulseResponse(
+  recording:
+    Float32Array,
+  sampleRate: number
+) {
+  const normalizedRecording =
+    normalize(recording);
+
+  const sweep =
+    generateSweep(
       sampleRate
+    );
+
+  const sweepStart =
+    findSweepStart(
+      normalizedRecording,
+      sweep
+    );
+
+  if (
+    sweepStart < 0
+  ) {
+    return null;
+  }
+
+  const tailDuration = 3;
+
+  const segmentEnd =
+    Math.min(
+      normalizedRecording.length,
+      sweepStart +
+        sweep.length +
+        Math.floor(
+          tailDuration *
+            sampleRate
+        )
+    );
+
+  const segment =
+    normalizedRecording.slice(
+      sweepStart,
+      segmentEnd
+    );
+
+  const inverseFilter =
+    createInverseFilter(
+      sweep,
+      sampleRate
+    );
+
+  const deconvolved =
+    fftConvolve(
+      segment,
+      inverseFilter
     );
 
   let peakIndex = 0;
   let peakValue = 0;
 
-  const peakSearchLength =
-    Math.min(
-      recording.length,
-      impulse.length
-    );
-
   for (
     let i = 0;
-    i < peakSearchLength;
+    i <
+    deconvolved.length;
     i++
   ) {
     const value =
       Math.abs(
-        impulse[i]
+        deconvolved[i]
       );
 
     if (
       value >
       peakValue
     ) {
-      peakValue =
-        value;
-
+      peakValue = value;
       peakIndex = i;
     }
   }
 
-  const maxLength =
+  const preSamples =
     Math.floor(
-      sampleRate * 5
+      0.01 *
+        sampleRate
     );
 
-  const endIndex =
-    Math.min(
-      peakIndex +
-        maxLength,
-      recording.length,
-      impulse.length
-    );
-
-  const response =
-    impulse.slice(
-      peakIndex,
-      endIndex
-    );
-
-  if (
-    response.length === 0
-  ) {
-    return null;
-  }
-
-  const noiseStart =
-    Math.floor(
-      response.length *
-      0.9
-    );
-
-  let noiseEnergy = 0;
-  let noiseCount = 0;
-
-  for (
-    let i =
-      noiseStart;
-    i <
-      response.length;
-    i++
-  ) {
-    noiseEnergy +=
-      response[i] *
-      response[i];
-
-    noiseCount++;
-  }
-
-  if (
-    noiseCount === 0
-  ) {
-    return null;
-  }
-
-  const averageNoiseEnergy =
-    noiseEnergy /
-    noiseCount;
-
-  const blockSize =
+  const start =
     Math.max(
-      1,
-      Math.floor(
-        sampleRate *
-        0.02
+      0,
+      peakIndex -
+        preSamples
+    );
+
+  const end =
+    Math.min(
+      deconvolved.length,
+      peakIndex +
+        Math.floor(
+          2 *
+            sampleRate
+        )
+    );
+
+  const impulse =
+    normalize(
+      deconvolved.slice(
+        start,
+        end
       )
     );
 
-  const minimumCutoffIndex =
-    Math.floor(
-      sampleRate *
-      0.2
+  return {
+    impulse:
+      impulse,
+
+    sweepStart:
+      sweepStart /
+      sampleRate,
+
+    impulsePeak:
+      peakIndex /
+      sampleRate,
+  };
+}
+
+function sosFilter(
+  signal:
+    Float64Array,
+  sections:
+    SOS[]
+) {
+  let current =
+    Float64Array.from(
+      signal
     );
 
-  const noiseThreshold =
-    averageNoiseEnergy *
-    10;
-
-  const blockEnergies:
-    number[] = [];
-
-  const blockStarts:
-    number[] = [];
-
   for (
-    let start =
-      minimumCutoffIndex;
-    start <
-      noiseStart;
-    start +=
-      blockSize
+    const section of
+    sections
   ) {
-    const end =
-      Math.min(
-        start +
-          blockSize,
-        response.length
+    const [
+      b0,
+      b1,
+      b2,
+      a0,
+      a1,
+      a2,
+    ] = section;
+
+    const output =
+      new Float64Array(
+        current.length
       );
 
-    let blockEnergy = 0;
+    let z1 = 0;
+    let z2 = 0;
 
     for (
-      let i = start;
-      i < end;
+      let i = 0;
+      i <
+      current.length;
       i++
     ) {
-      blockEnergy +=
-        response[i] *
-        response[i];
+      const input =
+        current[i];
+
+      const value =
+        (
+          b0 *
+            input +
+          z1
+        ) /
+        a0;
+
+      z1 =
+        b1 *
+          input -
+        a1 *
+          value +
+        z2;
+
+      z2 =
+        b2 *
+          input -
+        a2 *
+          value;
+
+      output[i] =
+        value;
     }
 
-    const averageBlockEnergy =
-      blockEnergy /
-      (end - start);
-
-    blockEnergies.push(
-      averageBlockEnergy
-    );
-
-    blockStarts.push(
-      start
-    );
+    current =
+      output;
   }
 
-  const smoothingBlocks =
-    5;
+  return current;
+}
 
-  const smoothedEnergies:
-    number[] = [];
+function reverseSignal(
+  signal:
+    Float64Array
+) {
+  const result =
+    new Float64Array(
+      signal.length
+    );
 
   for (
     let i = 0;
     i <
-      blockEnergies.length;
+    signal.length;
     i++
   ) {
-    const start =
-      Math.max(
-        0,
-        i -
-          smoothingBlocks +
-          1
-      );
-
-    let sum = 0;
-    let count = 0;
-
-    for (
-      let j = start;
-      j <= i;
-      j++
-    ) {
-      sum +=
-        blockEnergies[j];
-
-      count++;
-    }
-
-    smoothedEnergies.push(
-      sum / count
-    );
+    result[i] =
+      signal[
+        signal.length -
+        1 -
+        i
+      ];
   }
 
-  const requiredQuietBlocks =
-    5;
+  return result;
+}
 
-  let quietBlocks = 0;
-  let cutoffIndex = -1;
+function oddPad(
+  signal:
+    Float64Array,
+  padLength: number
+) {
+  const padded =
+    new Float64Array(
+      signal.length +
+      padLength * 2
+    );
 
   for (
     let i = 0;
-    i <
-      smoothedEnergies.length;
+    i < padLength;
     i++
   ) {
-    if (
-      smoothedEnergies[i] <=
-      noiseThreshold
-    ) {
-      quietBlocks++;
-    } else {
-      quietBlocks = 0;
-    }
-
-    if (
-      quietBlocks >=
-      requiredQuietBlocks
-    ) {
-      const firstQuietBlock =
-        i -
-        requiredQuietBlocks +
-        1;
-
-      cutoffIndex =
-        blockStarts[
-          firstQuietBlock
-        ];
-
-      break;
-    }
+    padded[i] =
+      2 *
+        signal[0] -
+      signal[
+        padLength -
+        i
+      ];
   }
 
-  if (
-    cutoffIndex === -1
+  padded.set(
+    signal,
+    padLength
+  );
+
+  const last =
+    signal.length -
+    1;
+
+  for (
+    let i = 0;
+    i < padLength;
+    i++
   ) {
-    return null;
+    padded[
+      padLength +
+        signal.length +
+        i
+    ] =
+      2 *
+        signal[last] -
+      signal[
+        last -
+        1 -
+        i
+      ];
   }
 
-  const cutoffResponse =
-    response.slice(
-      0,
-      cutoffIndex
+  return padded;
+}
+
+function sosFiltFilt(
+  signal:
+    Float64Array,
+  sections:
+    SOS[]
+) {
+  if (
+    signal.length < 30
+  ) {
+    return signal;
+  }
+
+  const padLength = 27;
+
+  const padded =
+    oddPad(
+      signal,
+      padLength
     );
 
-  if (
-    cutoffResponse.length ===
-    0
-  ) {
-    return null;
-  }
+  const forward =
+    sosFilter(
+      padded,
+      sections
+    );
 
+  const reversed =
+    reverseSignal(
+      forward
+    );
+
+  const backward =
+    sosFilter(
+      reversed,
+      sections
+    );
+
+  const restored =
+    reverseSignal(
+      backward
+    );
+
+  return restored.slice(
+    padLength,
+    padLength +
+      signal.length
+  );
+}
+
+function measureRT60(
+  signal:
+    Float64Array,
+  sampleRate: number
+) {
   const energy =
     new Float64Array(
-      cutoffResponse.length
+      signal.length
     );
 
-  let totalEnergy = 0;
+  let total = 0;
 
   for (
     let i =
-      cutoffResponse.length -
-      1;
+      signal.length - 1;
     i >= 0;
     i--
   ) {
-    totalEnergy +=
-      cutoffResponse[i] *
-      cutoffResponse[i];
+    total +=
+      signal[i] *
+      signal[i];
 
     energy[i] =
-      totalEnergy;
+      total;
   }
 
   if (
+    energy.length === 0 ||
     energy[0] <= 0
   ) {
     return null;
@@ -577,30 +862,30 @@ export function estimateRT60(
 
   const decayDb =
     new Float64Array(
-      cutoffResponse.length
+      energy.length
     );
 
   for (
     let i = 0;
     i <
-      decayDb.length;
+    energy.length;
     i++
   ) {
     decayDb[i] =
       10 *
       Math.log10(
         energy[i] /
-        energy[0]
+          energy[0]
       );
   }
 
   let startIndex = -1;
-  let endIndexT20 = -1;
+  let endIndex = -1;
 
   for (
     let i = 0;
     i <
-      decayDb.length;
+    decayDb.length;
     i++
   ) {
     if (
@@ -614,64 +899,52 @@ export function estimateRT60(
       startIndex !== -1 &&
       decayDb[i] <= -25
     ) {
-      endIndexT20 = i;
-
+      endIndex = i;
       break;
     }
   }
 
   if (
     startIndex === -1 ||
-    endIndexT20 === -1
+    endIndex === -1 ||
+    endIndex <=
+      startIndex
   ) {
     return null;
   }
 
-  const startTime =
-    startIndex /
-    sampleRate;
-
-  const endTime =
-    endIndexT20 /
-    sampleRate;
-
   let count = 0;
+
   let sumTime = 0;
   let sumDb = 0;
+
   let sumTimeDb = 0;
-  let sumTimeSquared = 0;
+
+  let sumTimeSquared =
+    0;
 
   for (
-    let i =
-      startIndex;
-    i <=
-      endIndexT20;
+    let i = startIndex;
+    i <= endIndex;
     i++
   ) {
     const time =
       i / sampleRate;
 
+    const db =
+      decayDb[i];
+
     count++;
 
-    sumTime +=
-      time;
+    sumTime += time;
 
-    sumDb +=
-      decayDb[i];
+    sumDb += db;
 
     sumTimeDb +=
-      time *
-      decayDb[i];
+      time * db;
 
     sumTimeSquared +=
-      time *
-      time;
-  }
-
-  if (
-    count < 2
-  ) {
-    return null;
+      time * time;
   }
 
   const denominator =
@@ -714,20 +987,18 @@ export function estimateRT60(
     count;
 
   let totalVariation = 0;
-  let unexplainedVariation =
-    0;
+
+  let errorVariation = 0;
 
   for (
-    let i =
-      startIndex;
-    i <=
-      endIndexT20;
+    let i = startIndex;
+    i <= endIndex;
     i++
   ) {
     const time =
       i / sampleRate;
 
-    const predictedDb =
+    const predicted =
       slope *
         time +
       intercept;
@@ -742,52 +1013,47 @@ export function estimateRT60(
         meanDb
       );
 
-    unexplainedVariation +=
+    errorVariation +=
       (
         decayDb[i] -
-        predictedDb
+        predicted
       ) *
       (
         decayDb[i] -
-        predictedDb
+        predicted
       );
   }
 
-  if (
-    totalVariation === 0
-  ) {
-    return null;
-  }
-
   const rSquared =
-    1 -
-    unexplainedVariation /
-      totalVariation;
+    totalVariation === 0
+      ? 0
+      : 1 -
+        errorVariation /
+          totalVariation;
 
   const rt60 =
     -60 /
     slope;
 
-  const decayPoints = [];
+  const decayPoints: {
+    time: number;
+    db: number;
+  }[] = [];
 
-  const numberOfPoints =
-    80;
-
-  const pointStep =
+  const step =
     Math.max(
       1,
       Math.floor(
         decayDb.length /
-        numberOfPoints
+          100
       )
     );
 
   for (
     let i = 0;
     i <
-      decayDb.length;
-    i +=
-      pointStep
+    decayDb.length;
+    i += step
   ) {
     decayPoints.push({
       time:
@@ -796,25 +1062,123 @@ export function estimateRT60(
 
       db:
         Math.max(
-          decayDb[i],
-          -60
+          -60,
+          decayDb[i]
         ),
     });
   }
 
   return {
-    rt60: rt60,
-    slope: slope,
+    rt60:
+      rt60,
+
+    slope:
+      slope,
+
     rSquared:
       rSquared,
+
     startTime:
-      startTime,
-    endTime:
-      endTime,
-    noiseCutoffTime:
-      cutoffIndex /
+      startIndex /
       sampleRate,
+
+    endTime:
+      endIndex /
+      sampleRate,
+
     decayPoints:
       decayPoints,
+  };
+}
+
+export function estimateRT60(
+  recording:
+    Float32Array,
+  sampleRate: number
+) {
+  if (
+    sampleRate !== 48000
+  ) {
+    return null;
+  }
+
+  const result =
+    getImpulseResponse(
+      recording,
+      sampleRate
+    );
+
+  if (!result) {
+    return null;
+  }
+
+  const impulse =
+    result.impulse;
+
+  const ir500 =
+    sosFiltFilt(
+      impulse,
+      SOS_500
+    );
+
+  const ir1000 =
+    sosFiltFilt(
+      impulse,
+      SOS_1000
+    );
+
+  const analysis500 =
+    measureRT60(
+      ir500,
+      sampleRate
+    );
+
+  const analysis1000 =
+    measureRT60(
+      ir1000,
+      sampleRate
+    );
+
+  if (
+    !analysis500 ||
+    !analysis1000
+  ) {
+    return null;
+  }
+
+  const midRT60 =
+    (
+      analysis500.rt60 +
+      analysis1000.rt60
+    ) /
+    2;
+
+  return {
+    rt60500:
+      analysis500.rt60,
+
+    rt601000:
+      analysis1000.rt60,
+
+    midRT60:
+      midRT60,
+
+    rSquared500:
+      analysis500.rSquared,
+
+    rSquared1000:
+      analysis1000.rSquared,
+
+    sweepStart:
+      result.sweepStart,
+
+    impulsePeak:
+      result.impulsePeak,
+
+    decayPoints500:
+      analysis500.decayPoints,
+
+    decayPoints1000:
+      analysis1000.decayPoints,
   };
 }
