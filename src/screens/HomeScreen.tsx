@@ -1,12 +1,14 @@
 import { StatusBar } from "expo-status-bar";
-import {StyleSheet, Text, TouchableOpacity, View, Platform,} from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View, Platform } from "react-native";
 
+// Defines the callbacks for navigating from the home screen
 type Props = {
   onStartMeasurement: () => void;
   onViewRecordings: () => void;
 };
 
-export default function HomeScreen({onStartMeasurement, onViewRecordings,}: Props) {
+// Displays the main menu of the room acoustic analyzer
+export default function HomeScreen({ onStartMeasurement, onViewRecordings }: Props) {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Room Acoustic Analyzer</Text>
@@ -15,22 +17,20 @@ export default function HomeScreen({onStartMeasurement, onViewRecordings,}: Prop
         Measure and analyze the acoustics of your room.
       </Text>
 
+      {/* Start a new room measurement */}
       <TouchableOpacity
         style={[styles.startButton, styles.firstButton]}
         onPress={onStartMeasurement}
       >
-        <Text style={styles.buttonText}>
-          New Room Measurement
-        </Text>
+        <Text style={styles.buttonText}>New Room Measurement</Text>
       </TouchableOpacity>
 
+      {/* Navigate to previously saved recordings */}
       <TouchableOpacity
         style={styles.startButton}
         onPress={onViewRecordings}
       >
-        <Text style={styles.buttonText}>
-          View Recordings
-        </Text>
+        <Text style={styles.buttonText}>View Recordings</Text>
       </TouchableOpacity>
 
       <StatusBar style="auto" />
@@ -38,6 +38,7 @@ export default function HomeScreen({onStartMeasurement, onViewRecordings,}: Prop
   );
 }
 
+// Defines the layout, typography and appearance of the home screen
 const styles = StyleSheet.create({
   container: {
     flex: 1,

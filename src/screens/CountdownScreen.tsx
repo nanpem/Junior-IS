@@ -1,14 +1,17 @@
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
-import {StyleSheet, Text,View, Platform,} from "react-native";
+import { StyleSheet, Text, View, Platform } from "react-native";
 
+// Defines the callback for completing the countdown
 type Props = {
   onFinished: () => void;
 };
 
-export default function CountdownScreen({onFinished,}: Props) {
+// Displays a countdown before starting the room measurement
+export default function CountdownScreen({ onFinished }: Props) {
   const [countdown, setCountdown] = useState(3);
 
+  // Decrease the countdown every second
   useEffect(() => {
     if (countdown > 0) {
       const timer = setTimeout(() => {
@@ -18,6 +21,7 @@ export default function CountdownScreen({onFinished,}: Props) {
       return () => clearTimeout(timer);
     }
 
+    // Transition to the recording screen after the countdown finishes
     const timer = setTimeout(() => {
       onFinished();
     }, 1000);
@@ -25,12 +29,13 @@ export default function CountdownScreen({onFinished,}: Props) {
     return () => clearTimeout(timer);
   }, [countdown, onFinished]);
 
+  // Display the current countdown value or the start message
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Get Ready</Text>
 
       <Text style={styles.countdown}>
-        {countdown > 0 ? countdown : "CLAP!"}
+        {countdown > 0 ? countdown : "START"}
       </Text>
 
       <StatusBar style="auto" />
@@ -38,6 +43,7 @@ export default function CountdownScreen({onFinished,}: Props) {
   );
 }
 
+// Defines the layout and appearance of the countdown screen
 const styles = StyleSheet.create({
   container: {
     flex: 1,

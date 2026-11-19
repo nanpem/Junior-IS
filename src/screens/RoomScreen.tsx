@@ -10,34 +10,33 @@ import {
   View,
 } from "react-native";
 
+// Defines the callback for passing room information to the next screen
 type Props = {
-  onContinue: (
-    roomName: string,
-    roomWidth: number,
-    roomLength: number
-  ) => void;
+  onContinue: (roomName: string, roomWidth: number, roomLength: number) => void;
 };
 
+// Collects the room name and dimensions before taking a measurement
 export default function RoomScreen({ onContinue }: Props) {
+  // Store the room information entered by the user
   const [roomName, setRoomName] = useState("");
   const [roomWidth, setRoomWidth] = useState("");
   const [roomLength, setRoomLength] = useState("");
 
+  // Checks the room information and passes it to the next screen
   function continueMeasurement() {
-    if (
-      roomName === "" ||
-      roomWidth === "" ||
-      roomLength === ""
-    ) {
+    // Prevent continuation if any required field is empty
+    if (roomName === "" || roomWidth === "" || roomLength === "") {
       return;
     }
 
+    // Convert the room dimensions from strings to numbers
     const width = Number(roomWidth);
     const length = Number(roomLength);
 
     onContinue(roomName, width, length);
   }
 
+  // Display the room information form with keyboard support
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -48,14 +47,16 @@ export default function RoomScreen({ onContinue }: Props) {
         keyboardShouldPersistTaps="handled"
       >
         <Text style={styles.title}>Room Information</Text>
-  
+
+        {/* Collect the room name */}
         <Text style={styles.label}>Room Name</Text>
         <TextInput
           style={styles.input}
           value={roomName}
           onChangeText={setRoomName}
         />
-  
+
+        {/* Collect the room width in meters */}
         <Text style={styles.label}>Room Width (meters)</Text>
         <TextInput
           style={styles.input}
@@ -63,7 +64,8 @@ export default function RoomScreen({ onContinue }: Props) {
           onChangeText={setRoomWidth}
           keyboardType="decimal-pad"
         />
-  
+
+        {/* Collect the room length in meters */}
         <Text style={styles.label}>Room Length (meters)</Text>
         <TextInput
           style={styles.input}
@@ -71,16 +73,14 @@ export default function RoomScreen({ onContinue }: Props) {
           onChangeText={setRoomLength}
           keyboardType="decimal-pad"
         />
-  
-        <Button
-          title="Continue"
-          onPress={continueMeasurement}
-        />
+
+        <Button title="Continue" onPress={continueMeasurement} />
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
+// Defines the layout and appearance of the room information screen
 const styles = StyleSheet.create({
   container: {
     flex: 1,
